@@ -198,17 +198,24 @@ SAMPLE_QUESTIONS = [
     "By what percentage must greenhouse gases drop by 2030?",
     "What replaced the old climate finance target?",
     "How has battery storage improved renewable energy?",
+    "What is the main goal of the Paris Agreement?",
+    "Which sectors are attracting the most green investment?",
+    "What role does the COP play in the UN climate framework?",
 ]
 
 if "query_input" not in st.session_state:
     st.session_state.query_input = ""
 
 st.markdown("<div class='gf-card-label' style='margin-bottom:0.4rem;'>Try asking</div>", unsafe_allow_html=True)
-chip_cols = st.columns(len(SAMPLE_QUESTIONS))
-for col, q in zip(chip_cols, SAMPLE_QUESTIONS):
-    with col:
-        if st.button(q, key=f"chip_{q}"):
-            st.session_state.query_input = q
+
+ROW_SIZE = 3
+for row_start in range(0, len(SAMPLE_QUESTIONS), ROW_SIZE):
+    row_questions = SAMPLE_QUESTIONS[row_start: row_start + ROW_SIZE]
+    chip_cols = st.columns(ROW_SIZE)
+    for col, q in zip(chip_cols, row_questions):
+        with col:
+            if st.button(q, key=f"chip_{q}"):
+                st.session_state.query_input = q
 
 query = st.text_input(
     "Your question",
