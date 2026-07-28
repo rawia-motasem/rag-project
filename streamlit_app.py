@@ -6,20 +6,22 @@ Ties together documents -> preprocessing -> chunking -> vector representation
 -> vector store -> retrieval -> prompting, and shows an answer with sources.
 """
 
-import importlib
+import os
 import streamlit as st
 
-rag = importlib.import_module("07_prompting")
-
+# 1. ضبط إعدادات الصفحة أولاً
 st.set_page_config(page_title="Green Future | Climate RAG Assistant", page_icon="🌿", layout="centered")
 
-# ---- Load the API key from Streamlit secrets (never hard-coded) ----
-try:
-    if not rag.OPENROUTER_API_KEY:
-        rag.OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
-    rag.OPENROUTER_MODEL = st.secrets.get("OPENROUTER_MODEL", rag.OPENROUTER_MODEL)
-except Exception:
-    pass
+# 2. جلب المفاتيح من Streamlit Secrets وضبطها في متغيرات البيئة قبل استيراد الكود
+api_key = st.secrets.get("OPENROUTER_API_KEY") or st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
+
+if api_key:
+    os.environ["OPENROUTER_API_KEY"] = api_key
+    os.environ["OPENAI_API_KEY"] = api_key
+
+# 3. استيراد وحدة RAG بعد إعداد البيئة
+import importlib
+rag = importlib.import_module("07_prompting")
 
 # ---------------------------------------------------------------------------
 # Visual identity: "Green Future"
@@ -226,38 +228,41 @@ query = st.text_input(
 ask_clicked = st.button("Ask", type="primary")
 
 if ask_clicked and query:
-    if not rag.OPENROUTER_API_KEY:
-        st.error("No API key found. Please configure OPENROUTER_API_KEY in Streamlit secrets.")
+    if not api_key:
+        st.error("⚠️ لم يتم العثور على API Key. يرجى إضافته في Streamlit Secrets تحت اسم OPENROUTER_API_KEY أو OPENAI_API_KEY.")
     else:
         with st.spinner("Retrieving context and generating answer..."):
-            answer, sources = rag.generate_answer(query, n_results=n_results)
+            try:
+                answer, sources = rag.generate_answer(query, n_results=n_results)
 
-        st.markdown(
-            f"""
-            <div class="gf-card">
-                <div class="gf-card-label">Answer</div>
-                {answer}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                st.markdown(
+                    f"""
+                    <div class="gf-card">
+                        <div class="gf-card-label">Answer</div>
+                        {answer}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
-        source_rows = ""
-        for s in sources:
-            status_class = "gf-status-current" if s["metadata"]["status"] == "CURRENT" else "gf-status-outdated"
-            source_rows += f"""
-            <div class="gf-source-row">
-                <span>{s['metadata']['title']} <span class="{status_class}">{s['metadata']['status']}</span></span>
-                <span style="color:#8FAE8B;">distance {s['distance']:.4f}</span>
-            </div>
-            """
+                source_rows = ""
+                for s in sources:
+                    status_class = "gf-status-current" if s["metadata"]["status"] == "CURRENT" else "gf-status-outdated"
+                    source_rows += f"""
+                    <div class="gf-source-row">
+                        <span>{s['metadata']['title']} <span class="{status_class}">{s['metadata']['status']}</span></span>
+                        <span style="color:#8FAE8B;">distance {s['distance']:.4f}</span>
+                    </div>
+                    """
 
-        st.markdown(
-            f"""
-            <div class="gf-card">
-                <div class="gf-card-label">Sources used</div>
-                {source_rows}
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+                st.markdown(
+                    f"""
+                    <div class="gf-card">
+                        <div class="gf-card-label">Sources used</div>
+                        {source_rows}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            except Exception as e:
+                st.error(f"حدث خطأ أثناء توليد الإجابة: {e}")
