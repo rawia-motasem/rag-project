@@ -54,8 +54,7 @@ Question: {query}
 Answer:"""
     return prompt
 
-
-def generate_answer(query, n_results=3):
+def generate_rag_response(query, n_results=3):
     """Full pipeline: retrieve context, build prompt, call the LLM, return the answer."""
     retrieved_chunks = retrieve_module.retrieve_context(query, n_results=n_results)
     prompt = build_prompt(query, retrieved_chunks)
