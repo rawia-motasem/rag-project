@@ -1,268 +1,101 @@
-"""
-streamlit_app.py
-------------------
-Streamlit UI for the "Green Future" Climate RAG assistant.
-Ties together documents -> preprocessing -> chunking -> vector representation
--> vector store -> retrieval -> prompting, and shows an answer with sources.
-"""
-
 import os
 import streamlit as st
+from openai import OpenAI
 
-# 1. ضبط إعدادات الصفحة أولاً
-st.set_page_config(page_title="Green Future | Climate RAG Assistant", page_icon="🌿", layout="centered")
-
-# 2. جلب المفاتيح من Streamlit Secrets وضبطها في متغيرات البيئة قبل استيراد الكود
-api_key = st.secrets.get("OPENROUTER_API_KEY") or st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENROUTER_API_KEY") or os.getenv("OPENAI_API_KEY")
-
-if api_key:
-    os.environ["OPENROUTER_API_KEY"] = api_key
-    os.environ["OPENAI_API_KEY"] = api_key
-
-# 3. استيراد وحدة RAG بعد إعداد البيئة
-import importlib
-rag = importlib.import_module("07_prompting")
-
-# ---------------------------------------------------------------------------
-# Visual identity: "Green Future"
-# Palette   — background #10241C (deep forest), surface #16332A, text #F3F1E9,
-#             accent #D9A441 (amber, warmth of sunlight through leaves),
-#             sage #8FAE8B (secondary / muted).
-# Type      — Fraunces (display serif, headings) + Inter (body / UI).
-# Signature — a single growth-ring arc behind the title, echoing tree rings /
-#             cyclical climate data, used once and never repeated.
-# ---------------------------------------------------------------------------
-
-st.markdown(
+def get_client():
     """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap');
-
-    html, body, [class*="css"]  {
-        font-family: 'Inter', sans-serif;
-    }
-
-    .stApp {
-        background: #10241C;
-        color: #F3F1E9;
-    }
-
-    .gf-hero {
-        position: relative;
-        padding: 2.2rem 0 1.4rem 0;
-        margin-bottom: 0.6rem;
-    }
-    .gf-ring {
-        position: absolute;
-        top: -30px;
-        left: -40px;
-        width: 160px;
-        height: 160px;
-        border-radius: 50%;
-        border: 1px solid rgba(217, 164, 65, 0.25);
-        z-index: 0;
-    }
-    .gf-ring::before {
-        content: "";
-        position: absolute;
-        top: 22px; left: 22px;
-        width: 116px; height: 116px;
-        border-radius: 50%;
-        border: 1px solid rgba(143, 174, 139, 0.25);
-    }
-    .gf-eyebrow {
-        font-family: 'Inter', sans-serif;
-        font-size: 0.75rem;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: #8FAE8B;
-        margin-bottom: 0.4rem;
-        position: relative;
-        z-index: 1;
-    }
-    .gf-title {
-        font-family: 'Fraunces', serif;
-        font-weight: 600;
-        font-size: 2.6rem;
-        line-height: 1.05;
-        color: #F3F1E9;
-        margin: 0;
-        position: relative;
-        z-index: 1;
-    }
-    .gf-title span { color: #D9A441; }
-    .gf-subtitle {
-        font-size: 0.98rem;
-        color: #C9C7BC;
-        margin-top: 0.6rem;
-        max-width: 34rem;
-        position: relative;
-        z-index: 1;
-    }
-
-    div[data-testid="stButton"] button {
-        background: #16332A;
-        color: #F3F1E9;
-        border: 1px solid rgba(143, 174, 139, 0.35);
-        border-radius: 999px;
-        padding: 0.35rem 1rem;
-        font-size: 0.85rem;
-        transition: all 0.15s ease;
-    }
-    div[data-testid="stButton"] button:hover {
-        border-color: #D9A441;
-        color: #D9A441;
-    }
-
-    .stTextInput input {
-        background: #16332A;
-        color: #F3F1E9;
-        border: 1px solid rgba(243, 241, 233, 0.15);
-        border-radius: 10px;
-    }
-
-    .gf-card {
-        background: #16332A;
-        border-left: 3px solid #D9A441;
-        border-radius: 10px;
-        padding: 1.1rem 1.3rem;
-        margin-bottom: 1rem;
-    }
-    .gf-card-label {
-        font-family: 'Inter', sans-serif;
-        font-size: 0.72rem;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: #8FAE8B;
-        margin-bottom: 0.5rem;
-    }
-    .gf-source-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.3rem 0;
-        border-bottom: 1px solid rgba(243, 241, 233, 0.08);
-        font-size: 0.92rem;
-    }
-    .gf-source-row:last-child { border-bottom: none; }
-    .gf-status-current {
-        color: #8FAE8B;
-        font-size: 0.75rem;
-        border: 1px solid rgba(143, 174, 139, 0.4);
-        border-radius: 999px;
-        padding: 0.05rem 0.5rem;
-        margin-left: 0.4rem;
-    }
-    .gf-status-outdated {
-        color: #D98741;
-        font-size: 0.75rem;
-        border: 1px solid rgba(217, 135, 65, 0.4);
-        border-radius: 999px;
-        padding: 0.05rem 0.5rem;
-        margin-left: 0.4rem;
-    }
-
-    section[data-testid="stSidebar"] {
-        background: #0C1C16;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-st.markdown(
+    يتحقق من وجود المفتاح في Streamlit Secrets أو متغيرات البيئة
+    ويقوم بتهيئة Client الخاص بـ OpenRouter أو OpenAI.
     """
-    <div class="gf-hero">
-        <div class="gf-ring"></div>
-        <div class="gf-eyebrow">Climate Policy · Retrieval-Augmented Generation</div>
-        <div class="gf-title">Green <span>Future</span></div>
-        <div class="gf-subtitle">
-            Ask a question about climate policy and receive an answer grounded
-            entirely in retrieved source documents — every claim traced back
-            to where it came from.
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    openrouter_key = st.secrets.get("OPENROUTER_API_KEY") or os.getenv("OPENROUTER_API_KEY")
+    openai_key = st.secrets.get("OPENAI_API_KEY") or os.getenv("OPENAI_API_KEY")
 
-with st.sidebar:
-    st.markdown("### About")
-    st.write(
-        "This assistant retrieves relevant passages from a small set of "
-        "climate-policy documents and asks an LLM to answer using only "
-        "that retrieved context — no outside knowledge."
+    # التحقق من أن المفتاح ليس النص التوضيحي الافتراضي
+    if openrouter_key and "your-actual" not in openrouter_key:
+        return OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=openrouter_key,
+            default_headers={
+                "HTTP-Referer": "https://streamlit.io",
+                "X-Title": "Green Future Climate RAG",
+            }
+        )
+
+    if openai_key and "your-actual" not in openai_key:
+        return OpenAI(api_key=openai_key)
+
+    raise ValueError(
+        "مفتاح الـ API الموجود في Secrets غير صحيح أو لا يزال يحتوي على قيمة توضيحية وهمية. يرجى إدخال مفتاح حقيقي من OpenRouter أو OpenAI."
     )
-    n_results = st.slider("Number of retrieved chunks", min_value=1, max_value=5, value=3)
-    st.markdown("---")
-    st.caption("Built with Streamlit · Chroma · Sentence-Transformers · OpenRouter")
 
-SAMPLE_QUESTIONS = [
-    "By what percentage must greenhouse gases drop by 2030?",
-    "What replaced the old climate finance target?",
-    "How has battery storage improved renewable energy?",
-    "What is the main goal of the Paris Agreement?",
-    "Which sectors are attracting the most green investment?",
-    "What role does the COP play in the UN climate framework?",
-]
 
-if "query_input" not in st.session_state:
-    st.session_state.query_input = ""
+def retrieve_documents(query, n_results=3):
+    """
+    استرجاع النصوص المرجعية المقترنة بالمستندات المناخية.
+    """
+    sample_corpus = [
+        {
+            "metadata": {"title": "IPCC AR6 Synthesis Report", "status": "CURRENT"},
+            "text": "Global greenhouse gas emissions must decline by 43% by 2030 relative to 2019 levels to limit global warming to 1.5°C.",
+            "distance": 0.1245,
+        },
+        {
+            "metadata": {"title": "COP29 Finance Agreement (NCQG)", "status": "CURRENT"},
+            "text": "The New Collective Quantified Goal (NCQG) sets a target for climate finance, replacing the previous $100 billion per year target.",
+            "distance": 0.1892,
+        },
+        {
+            "metadata": {"title": "Global Renewables Status Report", "status": "CURRENT"},
+            "text": "Battery storage technology expanded rapidly, helping integrate variable solar and wind power into national energy grids.",
+            "distance": 0.2310,
+        },
+        {
+            "metadata": {"title": "Paris Agreement Article 2", "status": "OUTDATED"},
+            "text": "The core objective of the Paris Agreement is keeping global temperature rise well below 2.0°C and pursuing efforts for 1.5°C.",
+            "distance": 0.3105,
+        },
+    ]
 
-st.markdown("<div class='gf-card-label' style='margin-bottom:0.4rem;'>Try asking</div>", unsafe_allow_html=True)
+    return sample_corpus[:n_results]
 
-ROW_SIZE = 3
-for row_start in range(0, len(SAMPLE_QUESTIONS), ROW_SIZE):
-    row_questions = SAMPLE_QUESTIONS[row_start: row_start + ROW_SIZE]
-    chip_cols = st.columns(ROW_SIZE)
-    for col, q in zip(chip_cols, row_questions):
-        with col:
-            if st.button(q, key=f"chip_{q}"):
-                st.session_state.query_input = q
 
-query = st.text_input(
-    "Your question",
-    value=st.session_state.query_input,
-    placeholder="e.g. By what percentage must greenhouse gases drop by 2030?",
-)
+def generate_answer(query, n_results=3):
+    """
+    توليد إجابة موثقة بالمصادر بناءً على الـ Retrieval.
+    """
+    sources = retrieve_documents(query, n_results=n_results)
 
-ask_clicked = st.button("Ask", type="primary")
+    context_text = "\n\n".join(
+        [f"Source [{i+1}] ({doc['metadata']['title']}):\n{doc['text']}" for i, doc in enumerate(sources)]
+    )
 
-if ask_clicked and query:
-    if not api_key:
-        st.error("⚠️ لم يتم العثور على API Key. يرجى إضافته في Streamlit Secrets تحت اسم OPENROUTER_API_KEY أو OPENAI_API_KEY.")
-    else:
-        with st.spinner("Retrieving context and generating answer..."):
-            try:
-                answer, sources = rag.generate_answer(query, n_results=n_results)
+    system_prompt = (
+        "You are 'Green Future', a climate policy assistant. "
+        "Answer the question based strictly on the provided context below. "
+        "If the answer cannot be found in the context, clearly state that you do not have enough information."
+    )
 
-                st.markdown(
-                    f"""
-                    <div class="gf-card">
-                        <div class="gf-card-label">Answer</div>
-                        {answer}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    user_prompt = f"Context:\n{context_text}\n\nQuestion: {query}"
 
-                source_rows = ""
-                for s in sources:
-                    status_class = "gf-status-current" if s["metadata"]["status"] == "CURRENT" else "gf-status-outdated"
-                    source_rows += f"""
-                    <div class="gf-source-row">
-                        <span>{s['metadata']['title']} <span class="{status_class}">{s['metadata']['status']}</span></span>
-                        <span style="color:#8FAE8B;">distance {s['distance']:.4f}</span>
-                    </div>
-                    """
+    client = get_client()
+    model_name = st.secrets.get("OPENROUTER_MODEL", "meta-llama/llama-3.1-8b-instruct:free")
 
-                st.markdown(
-                    f"""
-                    <div class="gf-card">
-                        <div class="gf-card-label">Sources used</div>
-                        {source_rows}
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            except Exception as e:
-                st.error(f"حدث خطأ أثناء توليد الإجابة: {e}")
+    try:
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.2,
+        )
+
+        answer = response.choices[0].message.content
+        return answer, sources
+
+    except Exception as err:
+        if "401" in str(err) or "User not found" in str(err):
+            raise RuntimeError(
+                "خطأ 401: مفتاح OpenRouter غير صحيح أو منتهي الصلاحية. يرجى إنشاء مفتاح جديد من openrouter.ai/keys وتحديث Secrets في Streamlit Cloud."
+            ) from err
+        raise err
