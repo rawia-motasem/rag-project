@@ -4,14 +4,14 @@ sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import streamlit as st
 import os
+import importlib
 
 # 1. Import local module
-import importlib
 rag = importlib.import_module("07_prompting")
 
-st.set_page_config(page_title="RAG Assistant", page_icon="")
+st.set_page_config(page_title="RAG Assistant", page_icon="🤖")
 
-st.title(" RAG Assistant")
+st.title("🤖 RAG Assistant")
 st.write("Ask questions based on your custom document store!")
 
 # 2. Get API Key from Streamlit Secrets or Environment
@@ -42,12 +42,20 @@ if user_query := st.chat_input("Ask a question about your documents..."):
     with st.chat_message("assistant"):
         with st.spinner("Retrieving context and generating answer..."):
             try:
-                # Call RAG logic from 07_prompting.py
-                response_text = rag.generate_rag_response(
-                    query=user_query,
-                    api_key=api_key,
-                    model=model_name
-                )
+                # Find available function in 07_prompting.py dynamically
+                if hasattr(rag, 'generate_rag_response'):
+                    response_text = rag.generate_rag_response(user_query, api_key=api_key, model=model_name)
+                elif hasattr(rag, 'rag_response'):
+                    response_text = rag.rag_response(user_query)
+                elif hasattr(rag, 'generate_response'):
+                    response_text = rag.generate_response(user_query)
+                elif hasattr(rag, 'answer_question'):
+                    response_text = rag.answer_question(user_query)
+                elif hasattr(rag, 'main'):
+                    response_text = rag.main(user_query)
+                else:
+                    response_text = "Could not find a valid response function in 07_prompting.py"
+
                 st.markdown(response_text)
                 st.session_state.messages.append({"role": "assistant", "content": response_text})
             except Exception as e:
