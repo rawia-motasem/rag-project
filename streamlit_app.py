@@ -85,10 +85,15 @@ if not api_key:
 
 rag = importlib.import_module("07_prompting")
 
-if 'query_input' not in st.session_state:
-    st.session_state.query_input = ""
-if 'current_answer' not in st.session_state:
+# Initialize Session State Variables
+if "user_question" not in st.session_state:
+    st.session_state.user_question = ""
+if "current_answer" not in st.session_state:
     st.session_state.current_answer = None
+
+# Function to handle button clicks directly
+def set_question(q_text):
+    st.session_state.user_question = q_text
 
 # --- 3. SIDEBAR ---
 with st.sidebar:
@@ -106,30 +111,28 @@ st.markdown("<p class='subtitle-text'>Ask a question about climate policy and re
 st.markdown("### TRY ASKING")
 col1, col2, col3 = st.columns([1.5, 1.5, 2])
 
-if col1.button("🌱 Goals of Climate Policy?"):
-    st.session_state.query_input = "What are the key goals of the Climate Policy?"
-if col2.button("🤝 Technology contribution?"):
-    st.session_state.query_input = "How does green technology contribute to sustainability?"
-if col3.button("📋 Action steps for a Green economy?"):
-    st.session_state.query_input = "What action steps are recommended for a sustainable future?"
+# Using on_click callback to update state before rerender
+col1.button("🌱 Goals of Climate Policy?", on_click=set_question, args=("What are the key goals of the Climate Policy?",))
+col2.button("🤝 Technology contribution?", on_click=set_question, args=("How does green technology contribute to sustainability?",))
+col3.button("📋 Action steps for a Green economy?", on_click=set_question, args=("What action steps are recommended for a sustainable future?",))
 
-# Question Input
-user_query = st.text_input("Your question", value=st.session_state.query_input, key="user_question_key")
-ask_pressed = st.button("Ask", key="ask_button")
+# Text input synced with session state
+query = st.text_input("Your question", key="user_question")
 
-# Trigger search either on 'Ask' button click OR clicking a suggested button
-should_run = ask_pressed or (st.session_state.query_input and user_query == st.session_state.query_input)
+ask_button = st.button("Ask")
 
-if should_run and user_query:
-    with st.spinner("Retrieving context and generating answer..."):
-        try:
-            if hasattr(rag, 'generate_rag_response'):
-                response_text = rag.generate_rag_response(user_query, api_key=api_key, model=model_name)
-                st.session_state.current_answer = response_text
-            else:
-                st.error("Function `generate_rag_response` not found in 07_prompting.py")
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
+# Trigger search if Ask button clicked OR if a question exists
+if ask_button or query:
+    if query.strip():
+        with st.spinner("Retrieving context and generating answer..."):
+            try:
+                if hasattr(rag, 'generate_rag_response'):
+                    response_text = rag.generate_rag_response(query, api_key=api_key, model=model_name)
+                    st.session_state.current_answer = response_text
+                else:
+                    st.error("Function `generate_rag_response` not found in 07_prompting.py")
+            except Exception as e:
+                st.error(f"An error occurred: {str(e)}")
 
 # --- 5. DISPLAY RESULTS ---
 if st.session_state.current_answer:
