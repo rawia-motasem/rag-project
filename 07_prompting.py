@@ -1,52 +1,59 @@
 """
-07_prompting.py
------------------
-Step 7 of the RAG pipeline: Prompting & Generation.
-Retrieves relevant context chunks (step 6) and asks an LLM (via OpenRouter)
-to answer using ONLY that context.
+streamlit_app.py
+------------------
+Streamlit UI for the Climate RAG assistant.
+Ties together documents -> preprocessing -> chunking -> vector representation
+-> vector store -> retrieval -> prompting, and shows an answer with sources.
 """
 
+# Patch: Streamlit Cloud's system sqlite3 is too old for chromadb.
+# pysqlite3-binary (in requirements.txt) provides a newer sqlite3 build.
+__import__("pysqlite3")
+import sys
+sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+
 import importlib
-from openai import OpenAI
+import streamlit as st
 
-retrieve_module = importlib.import_module("06_retrieve_context")
+rag = importlib.import_module("07_prompting")
 
+st.set_page_config(page_title="Climate RAG Assistant", page_icon="🌍")
 
-def build_prompt(query, context_chunks):
-    context_text = "\n\n".join(
-        f"[Source: {c['metadata'].get('title', c['chunk_id'])}]\n{c['text']}"
-        for c in context_chunks
+# ---- Load the API key from Streamlit secrets (never hard-coded) ----
+try:
+    if not rag.OPENROUTER_API_KEY:
+        rag.OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
+    rag.OPENROUTER_MODEL = st.secrets.get("OPENROUTER_MODEL", rag.OPENROUTER_MODEL)
+except Exception:
+    pass
+
+st.title("🌍 Climate RAG Assistant")
+st.caption("Ask a question and get an answer grounded in the climate policy documents below.")
+
+with st.sidebar:
+    st.subheader("About")
+    st.write(
+        "This assistant retrieves relevant chunks from a small set of "
+        "climate-policy documents and asks an LLM to answer using only "
+        "that retrieved context."
     )
-    return f"""You are a climate policy assistant. Answer the question using ONLY the
-context below. If the answer is not contained in the context, say you don't know.
+    n_results = st.slider("Number of retrieved chunks", min_value=1, max_value=5, value=3)
 
-Context:
-{context_text}
+query = st.text_input("Your question", placeholder="e.g. By what percentage must greenhouse gases drop by 2030?")
 
-Question: {query}
+if st.button("Ask") and query:
+    if not rag.OPENROUTER_API_KEY:
+        st.error("No API key found. Please configure OPENROUTER_API_KEY in Streamlit secrets.")
+    else:
+        with st.spinner("Retrieving context and generating answer..."):
+            answer, sources = rag.generate_answer(query, n_results=n_results)
 
-Answer:"""
+        st.markdown("### Answer")
+        st.write(answer)
 
-
-def generate_rag_response(query, api_key, model="openai/gpt-4o-mini", n_results=3):
-    """Retrieves context for the query and generates an answer grounded in it."""
-    context_chunks = retrieve_module.retrieve_context(query, n_results=n_results)
-
-    if not context_chunks:
-        return "No relevant context was found for this question."
-
-    prompt = build_prompt(query, context_chunks)
-
-    client = OpenAI(base_url="https://openrouter.ai/api/v1", api_key=api_key)
-    completion = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return completion.choices[0].message.content
-
-
-if __name__ == "__main__":
-    import os
-    test_query = "By what percentage must greenhouse gases drop by 2030?"
-    answer = generate_rag_response(test_query, api_key=os.getenv("OPENROUTER_API_KEY", ""))
-    print(f"Query: {test_query}\n\nAnswer:\n{answer}")
+        st.markdown("### Sources used")
+        for s in sources:
+            st.write(
+                f"- **{s['metadata']['title']}** "
+                f"({s['metadata']['status']}, distance: {s['distance']:.4f})"
+            )
