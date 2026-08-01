@@ -149,26 +149,24 @@ if ask_button or query:
 
 # --- 5. DISPLAY RESULTS ---
 if st.session_state.current_answer:
-    st.markdown(f"""
-    <div class="result-box">
-        <div class="result-header">ANSWER</div>
-        <p style="font-size: 1.05rem; line-height: 1.6; color: #f0f0f0;">{st.session_state.current_answer}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="result-box"><div class="result-header">ANSWER</div>'
+        f'<p style="font-size:1.05rem;line-height:1.6;color:#f0f0f0;">{st.session_state.current_answer}</p></div>',
+        unsafe_allow_html=True,
+    )
 
     sources_html = ""
     for s in (st.session_state.current_sources or []):
-        sources_html += f"""
-        <div class="source-item">
-            <span style="color: #6ed0ac; font-weight: 500;">{s['metadata']['title']}</span>
-            <span style="color: #6ed0ac; opacity: 0.8; font-size: 0.75rem; border: 1px solid #6ed0ac; border-radius: 4px; padding: 2px 6px; margin-left: 8px;">{s['metadata']['status']}</span>
-            <span style="float: right; color: #a0a0a0;">distance {s['distance']:.4f}</span>
-        </div>
-        """
+        sources_html += (
+            f'<div class="source-item">'
+            f'<span style="color:#6ed0ac;font-weight:500;">{s["metadata"]["title"]}</span>'
+            f'<span style="color:#6ed0ac;opacity:0.8;font-size:0.75rem;border:1px solid #6ed0ac;'
+            f'border-radius:4px;padding:2px 6px;margin-left:8px;">{s["metadata"]["status"]}</span>'
+            f'<span style="float:right;color:#a0a0a0;">distance {s["distance"]:.4f}</span>'
+            f'</div>'
+        )
 
-    st.markdown(f"""
-    <div class="result-box">
-        <div class="result-header">SOURCES USED</div>
-        {sources_html}
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="result-box"><div class="result-header">SOURCES USED</div>{sources_html}</div>',
+        unsafe_allow_html=True,
+    )
