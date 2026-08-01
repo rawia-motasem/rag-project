@@ -1,5 +1,9 @@
 streamlit
-chromadb
+pandas
+numpy
+scikit-learn
+rank-bm25
 sentence-transformers
 openai
+chromadb
 pysqlite3-binary
