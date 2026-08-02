@@ -129,10 +129,10 @@ st.markdown(
 )
 
 st.markdown("### TRY ASKING")
-col1, col2, col3 = st.columns([1.5, 1.5, 2])
-col1.button("🌱 Goals of Climate Policy?", on_click=set_question, args=("What are the key goals of the Climate Policy?",))
-col2.button("🤝 Technology contribution?", on_click=set_question, args=("How does green technology contribute to sustainability?",))
-col3.button("📋 Action steps for a Green economy?", on_click=set_question, args=("What action steps are recommended for a sustainable future?",))
+col1, col2, col3 = st.columns([1.8, 1.8, 1.8])
+col1.button("🌍 GHG reduction target by 2030?", on_click=set_question, args=("By what percentage must greenhouse gases drop by 2030?",))
+col2.button("💼 Green economy sectors?", on_click=set_question, args=("What sectors are attracting investment in the green economy?",))
+col3.button("🔋 Battery storage reliability?", on_click=set_question, args=("How has battery storage improved renewable energy reliability?",))
 
 query = st.text_input("Your question", key="user_question")
 ask_button = st.button("Ask")
